@@ -1,40 +1,48 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { Category } from '../../models/types';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { Category } from '../../models/Category';
+import { CategoryService } from '../../services/categoryService';
 
-type CategoriesState = {
-    items: Category[];
+interface State {
+    list: Category[];
+}
+
+const initialState: State = {
+    list: [],
 };
 
-const initialState: CategoriesState = {
-    items: [
-        { id: '1', name: 'Jedzenie', type: 'expense', color: '#ef4444' },
-        { id: '2', name: 'Transport', type: 'expense', color: '#3b82f6' },
-        { id: '3', name: 'Rachunki', type: 'expense', color: '#f59e0b' },
-    ],
-};
+export const loadCategories = createAsyncThunk(
+    'categories/load',
+    async () => {
+        return await CategoryService.getAll();
+    }
+);
 
-const categoriesSlice = createSlice({
+const slice = createSlice({
     name: 'categories',
     initialState,
     reducers: {
-        addCategory: {
-            reducer: (state, action: PayloadAction<Category>) => {
-                state.items.push(action.payload);
-            },
-            prepare: (name: string) => ({
-                payload: {
-                    id: Date.now().toString(),
-                    name,
-                    type: 'expense' as const,
-                    color: '#6366f1',
-                },
-            }),
+        addCategory: (s, a) => {
+            s.list.push(a.payload);
         },
-        removeCategory: (state, action: PayloadAction<string>) => {
-            state.items = state.items.filter(category => category.id !== action.payload);
+        editCategory: (s, a) => {
+            const i = s.list.findIndex(x => x.id === a.payload.id);
+            if (i !== -1) s.list[i] = a.payload;
         },
+        deleteCategory: (s, a) => {
+            s.list = s.list.filter(x => x.id !== a.payload);
+        },
+    },
+    extraReducers: (b) => {
+        b.addCase(loadCategories.fulfilled, (s, a) => {
+            s.list = a.payload;
+        });
     },
 });
 
-export const { addCategory, removeCategory } = categoriesSlice.actions;
-export default categoriesSlice.reducer;
+export const {
+    addCategory,
+    editCategory,
+    deleteCategory,
+} = slice.actions;
+
+export default slice.reducer;
