@@ -1,130 +1,114 @@
-import React, { useState } from 'react';
-import {
-    Text,
-    StyleSheet,
-    TextInput,
-    Pressable,
-    FlatList,
-    View,
-} from 'react-native';
-import ScreenContainer from '../components/ScreenContainer';
-import { useAppDispatch, useAppSelector } from '../hooks/redux';
-import { addCategory, removeCategory } from '../store/slices/categoriesSlice';
+import React, { useMemo } from 'react';
+import { View, Text, FlatList } from 'react-native';
+import { useExpenses } from '../hooks/useExpenses';
+import { useCategories } from '../hooks/useCategories';
+import { useBudget } from '../hooks/useBudget';
+import { useUser } from '../hooks/useUser';
 
-export default function CategoriesScreen() {
-    const [categoryName, setCategoryName] = useState('');
-    const categories = useAppSelector(state => state.categories.items);
-    const dispatch = useAppDispatch();
+export default function DashboardScreen() {
+    const { expenses } = useExpenses();
+    const { categories } = useCategories();
+    const { budgets } = useBudget();
+    const { user } = useUser();
 
-    const handleAddCategory = () => {
-        const trimmedName = categoryName.trim();
+    // 💰 total spent
+    const totalSpent = useMemo(() => {
+        return expenses.reduce((sum, e) => sum + e.amount, 0);
+    }, [expenses]);
 
-        if (!trimmedName) return;
+    // 📅 current month (YYYY-MM)
+    const currentMonth = new Date().toISOString().slice(0, 7);
 
-        dispatch(addCategory(trimmedName));
-        setCategoryName('');
-    };
+    const monthlyExpenses = useMemo(() => {
+        return expenses.filter(e => e.expenseDate.startsWith(currentMonth));
+    }, [expenses, currentMonth]);
+
+    const monthlySpent = useMemo(() => {
+        return monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
+    }, [monthlyExpenses]);
+
+    const currentBudget = useMemo(() => {
+        return budgets.find(b => b.month === currentMonth);
+    }, [budgets, currentMonth]);
 
     return (
-        <ScreenContainer>
-            <Text style={styles.title}>Kategorie</Text>
-            <Text style={styles.subtitle}>Dodawaj i usuwaj kategorie wydatków.</Text>
+        <View style={{ flex: 1, padding: 16, gap: 16 }}>
 
-            <View style={styles.form}>
-                <TextInput
-                    value={categoryName}
-                    onChangeText={setCategoryName}
-                    placeholder="Nazwa kategorii"
-                    style={styles.input}
-                />
-
-                <Pressable style={styles.addButton} onPress={handleAddCategory}>
-                    <Text style={styles.addButtonText}>Dodaj</Text>
-                </Pressable>
+            {/* 👤 USER */}
+            <View>
+                <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
+                    Witaj {user?.name ?? 'Użytkowniku'}
+                </Text>
+                <Text>Waluta: {user?.currency ?? '-'}</Text>
             </View>
 
-            <FlatList
-                data={categories}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                renderItem={({ item }) => (
-                    <View style={styles.categoryItem}>
-                        <Text style={styles.categoryName}>{item.name}</Text>
+            {/* 💰 TOTAL */}
+            <View>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>
+                    Wszystkie wydatki
+                </Text>
+                <Text style={{ fontSize: 16 }}>{totalSpent.toFixed(2)}</Text>
+            </View>
 
-                        <Pressable
-                            style={styles.deleteButton}
-                            onPress={() => dispatch(removeCategory(item.id))}
-                        >
-                            <Text style={styles.deleteButtonText}>Usuń</Text>
-                        </Pressable>
-                    </View>
-                )}
-            />
-        </ScreenContainer>
+            {/* 📅 MONTHLY */}
+            <View>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>
+                    Ten miesiąc ({currentMonth})
+                </Text>
+                <Text style={{ fontSize: 16 }}>{monthlySpent.toFixed(2)}</Text>
+            </View>
+
+            {/* 🎯 BUDGET */}
+            <View>
+                <Text style={{ fontSize: 18, fontWeight: '600' }}>
+                    Budżet
+                </Text>
+
+                <Text>
+                    Plan: {currentBudget?.plannedAmount ?? 0}
+                </Text>
+
+                <Text>
+                    Wykorzystanie: {monthlySpent.toFixed(2)} / {currentBudget?.plannedAmount ?? 0}
+                </Text>
+            </View>
+
+            {/* 🧾 RECENT EXPENSES */}
+            <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 8 }}>
+                    Ostatnie wydatki
+                </Text>
+
+                <FlatList
+                    data={expenses.slice().reverse().slice(0, 10)}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => {
+                        const category = categories.find(c => c.id === item.categoryId);
+
+                        return (
+                            <View
+                                style={{
+                                    padding: 10,
+                                    borderBottomWidth: 1,
+                                    borderColor: '#eee',
+                                }}
+                            >
+                                <Text style={{ fontWeight: '600' }}>
+                                    {item.title}
+                                </Text>
+
+                                <Text>
+                                    {item.amount} • {category?.name ?? 'Brak kategorii'}
+                                </Text>
+
+                                <Text style={{ fontSize: 12, opacity: 0.6 }}>
+                                    {item.expenseDate}
+                                </Text>
+                            </View>
+                        );
+                    }}
+                />
+            </View>
+        </View>
     );
 }
-
-const styles = StyleSheet.create({
-    title: {
-        fontSize: 28,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 15,
-        color: '#666',
-        marginBottom: 20,
-    },
-    form: {
-        gap: 12,
-        marginBottom: 20,
-    },
-    input: {
-        borderWidth: 1,
-        borderColor: '#ddd',
-        borderRadius: 12,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        fontSize: 16,
-        backgroundColor: '#fff',
-    },
-    addButton: {
-        backgroundColor: '#4f46e5',
-        paddingVertical: 14,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    addButtonText: {
-        color: '#fff',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    listContent: {
-        gap: 12,
-        paddingBottom: 20,
-    },
-    categoryItem: {
-        borderWidth: 1,
-        borderColor: '#e5e7eb',
-        borderRadius: 14,
-        padding: 16,
-        backgroundColor: '#fff',
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    categoryName: {
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    deleteButton: {
-        backgroundColor: '#ef4444',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 10,
-    },
-    deleteButtonText: {
-        color: '#fff',
-        fontWeight: '600',
-    },
-});
