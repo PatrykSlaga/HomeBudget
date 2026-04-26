@@ -8,8 +8,12 @@
     "skipLibCheck": true
   },
   "include": [
-    "src",
+    "frontend",
+    "backend",
     "App.tsx",
     "index.ts"
+  ],
+  "exclude": [
+    "backend/tests"
   ]
 }
