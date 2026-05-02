@@ -3,9 +3,22 @@ import { Expense } from '../models/Expense';
 
 export const ExpenseService = {
     getAll(): Expense[] {
-        const rows = db.getAllSync('SELECT * FROM expenses');
+        const rows = db.getAllSync<Expense>('SELECT * FROM expenses');
 
         console.log('🔵 GET ALL EXPENSES:', rows);
+
+        return rows;
+    },
+
+    getByCategoryId(categoryId: string): Expense[] {
+        const rows = db.getAllSync<Expense>(
+            `SELECT * FROM expenses 
+             WHERE categoryId = ? 
+             ORDER BY expenseDate DESC`,
+            [categoryId]
+        );
+
+        console.log('🔵 GET EXPENSES BY CATEGORY:', categoryId, rows);
 
         return rows;
     },

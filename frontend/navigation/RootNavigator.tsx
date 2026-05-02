@@ -4,12 +4,18 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import MainTabs from './MainTabs';
+import CategoryExpensesScreen from '../screens/CategoryExpensesScreen';
 import { User } from '../../backend/models/User';
 
 export type RootStackParamList = {
     Login: undefined;
     Register: undefined;
     MainTabs: undefined;
+    CategoryExpenses: {
+        categoryId: string;
+        categoryName: string;
+        categoryIcon: string;
+    };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -43,7 +49,13 @@ export default function RootNavigator() {
                     </Stack.Screen>
                 )
             ) : (
-                <Stack.Screen name="MainTabs" component={MainTabs} />
+                <>
+                    <Stack.Screen name="MainTabs" component={MainTabs} />
+                    <Stack.Screen
+                        name="CategoryExpenses"
+                        component={CategoryExpensesScreen}
+                    />
+                </>
             )}
         </Stack.Navigator>
     );
