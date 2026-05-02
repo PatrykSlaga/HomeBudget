@@ -1,39 +1,54 @@
-import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, G } from 'react-native-svg';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+import LeftSidebar, { PeriodFilter } from '../components/LeftSidebar';
+import RightSidebar from '../components/RightSidebar';
+
+import type { RootStackParamList } from '../navigation/RootNavigator';
+import { Category } from '../../backend/models/Category';
+import { Expense } from '../../backend/models/Expense';
+import { CategoryService } from '../../backend/services/categoryService';
+import { ExpenseService } from '../../backend/services/expenseService';
 
 type ExpenseCategory = {
+    id: string;
     name: string;
     amount: number;
     color: string;
 };
 
-type DashboardData = {
-    incomeTotal: number;
-    categories: ExpenseCategory[];
-};
-
-const DASHBOARD_DATA: DashboardData = {
-    incomeTotal: 1583.0,
-    categories: [
-        { name: 'Dom', amount: 320.0, color: '#9fd27f' },
-        { name: 'Transport', amount: 180.0, color: '#8ccf67' },
-        { name: 'Rachunki', amount: 290.0, color: '#b2de97' },
-        { name: 'Żywność', amount: 360.0, color: '#7fc85a' },
-        { name: 'Rozrywka', amount: 224.59, color: '#a4db87' },
-    ],
-};
+const INCOME_TOTAL = 1583.0;
 
 function formatCurrency(value: number) {
     return `${value.toFixed(2).replace('.', ',')}zł`;
 }
 
-function AppHeader() {
+type AppHeaderProps = {
+    onOpenLeftSidebar: () => void;
+    onOpenRightSidebar: () => void;
+};
+
+function AppHeader({
+                       onOpenLeftSidebar,
+                       onOpenRightSidebar,
+                   }: AppHeaderProps) {
     return (
         <View style={styles.header}>
             <View style={styles.headerLeft}>
-                <Pressable style={styles.menuButton}>
+                <Pressable
+                    style={styles.menuButton}
+                    onPress={onOpenLeftSidebar}
+                >
                     <View style={styles.menuLine} />
                     <View style={styles.menuLine} />
                     <View style={styles.menuLine} />
@@ -54,7 +69,10 @@ function AppHeader() {
                     </View>
                 </Pressable>
 
-                <Pressable style={styles.moreButton}>
+                <Pressable
+                    style={styles.moreButton}
+                    onPress={onOpenRightSidebar}
+                >
                     <View style={styles.moreDot} />
                     <View style={styles.moreDot} />
                     <View style={styles.moreDot} />
@@ -116,7 +134,7 @@ function DonutChart({
 
                         return (
                             <Circle
-                                key={`${category.name}-${index}`}
+                                key={`${category.id}-${index}`}
                                 cx={size / 2}
                                 cy={size / 2}
                                 r={radius}
@@ -133,32 +151,134 @@ function DonutChart({
             </Svg>
 
             <View style={styles.chartCenter}>
-                <Text style={styles.chartIncome}>{formatCurrency(incomeTotal)}</Text>
-                <Text style={styles.chartExpense}>{formatCurrency(expenseTotal)}</Text>
+                <Text style={styles.chartIncome}>
+                    {formatCurrency(incomeTotal)}
+                </Text>
+
+                <Text style={styles.chartExpense}>
+                    {formatCurrency(expenseTotal)}
+                </Text>
             </View>
         </View>
     );
 }
 
 export default function DashboardScreen() {
-    const currentData = DASHBOARD_DATA;
+    const navigation =
+        useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+
+    const [leftSidebarVisible, setLeftSidebarVisible] = useState(false);
+    const [rightSidebarVisible, setRightSidebarVisible] = useState(false);
+
+    const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('all');
+
+    const loadDashboardData = async () => {
+        const loadedCategories = await CategoryService.getAll();
+        const loadedExpenses = ExpenseService.getAll();
+
+        setCategories(loadedCategories);
+        setExpenses(loadedExpenses);
+    };
+
+    useEffect(() => {
+        loadDashboardData();
+    }, []);
+
+    const today = new Date().toISOString().slice(0, 10);
+    const currentMonth = new Date().toISOString().slice(0, 7);
+
+    const filteredExpenses = useMemo(() => {
+        return expenses.filter(expense => {
+            if (selectedPeriod === 'all') {
+                return true;
+            }
+
+            if (selectedPeriod === 'day') {
+                return expense.expenseDate.startsWith(today);
+            }
+
+            return expense.expenseDate.startsWith(currentMonth);
+        });
+    }, [expenses, selectedPeriod, today, currentMonth]);
+
+    const chartCategories = useMemo<ExpenseCategory[]>(() => {
+        return categories.map(category => {
+            const amount = filteredExpenses
+                .filter(expense => expense.categoryId === category.id)
+                .reduce((sum, expense) => sum + expense.amount, 0);
+
+            return {
+                id: category.id,
+                name: category.name,
+                amount,
+                color: category.color || '#9fd27f',
+            };
+        });
+    }, [categories, filteredExpenses]);
 
     const expenseTotal = useMemo(() => {
-        return currentData.categories.reduce((sum, item) => sum + item.amount, 0);
-    }, [currentData.categories]);
+        return filteredExpenses.reduce(
+            (sum, expense) => sum + expense.amount,
+            0
+        );
+    }, [filteredExpenses]);
 
-    const balance = currentData.incomeTotal - expenseTotal;
+    const balance = INCOME_TOTAL - expenseTotal;
+
+    const openCategoryScreen = (category: Category) => {
+        navigation.navigate('CategoryExpenses', {
+            categoryId: category.id,
+            categoryName: category.name,
+            categoryIcon: category.icon,
+        });
+    };
+
+    const addDemoExpense = async () => {
+        if (categories.length === 0) {
+            console.log('Brak kategorii — nie można dodać wydatku testowego.');
+            return;
+        }
+
+        const randomCategory =
+            categories[Math.floor(Math.random() * categories.length)];
+
+        const amount = Math.floor(Math.random() * 120) + 30;
+
+        ExpenseService.add({
+            id: Date.now().toString(),
+            userId: 'user1',
+            categoryId: randomCategory.id,
+            amount,
+            title: `Wydatek testowy - ${randomCategory.name}`,
+            note: 'Dodany z przycisku plus',
+            expenseDate: new Date().toISOString(),
+            paymentMethod: 'cash',
+            createdAt: new Date().toISOString(),
+        });
+
+        await loadDashboardData();
+    };
 
     return (
         <SafeAreaView style={styles.safeArea} edges={['top']}>
             <View style={styles.container}>
-                <AppHeader />
+                <AppHeader
+                    onOpenLeftSidebar={() => setLeftSidebarVisible(true)}
+                    onOpenRightSidebar={() => setRightSidebarVisible(true)}
+                />
 
-                <View style={styles.content}>
+                <ScrollView
+                    style={styles.scroll}
+                    contentContainerStyle={styles.content}
+                    showsVerticalScrollIndicator={false}
+                >
                     <DonutChart
-                        incomeTotal={currentData.incomeTotal}
+                        incomeTotal={INCOME_TOTAL}
                         expenseTotal={expenseTotal}
-                        categories={currentData.categories}
+                        categories={chartCategories}
                     />
 
                     <View style={styles.balanceRow}>
@@ -178,11 +298,28 @@ export default function DashboardScreen() {
                             <Text style={styles.minusText}>−</Text>
                         </Pressable>
 
-                        <Pressable style={styles.plusButton}>
+                        <Pressable
+                            style={styles.plusButton}
+                            onPress={addDemoExpense}
+                        >
                             <Text style={styles.plusText}>+</Text>
                         </Pressable>
                     </View>
-                </View>
+                </ScrollView>
+
+                <LeftSidebar
+                    visible={leftSidebarVisible}
+                    selectedPeriod={selectedPeriod}
+                    onSelectPeriod={setSelectedPeriod}
+                    onClose={() => setLeftSidebarVisible(false)}
+                />
+
+                <RightSidebar
+                    visible={rightSidebarVisible}
+                    categories={categories}
+                    onOpenCategory={openCategoryScreen}
+                    onClose={() => setRightSidebarVisible(false)}
+                />
             </View>
         </SafeAreaView>
     );
@@ -288,19 +425,21 @@ const styles = StyleSheet.create({
         backgroundColor: '#ffffff',
         marginVertical: 2,
     },
-    content: {
+    scroll: {
         flex: 1,
-        alignItems: 'center',
-        paddingTop: 80,
-        paddingHorizontal: 20,
     },
-
+    content: {
+        alignItems: 'center',
+        paddingTop: 66,
+        paddingHorizontal: 20,
+        paddingBottom: 34,
+    },
     chartWrapper: {
         width: 230,
         height: 230,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 34,
+        marginBottom: 70,
     },
     chartCenter: {
         position: 'absolute',
@@ -325,7 +464,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 34,
+        marginBottom: 52,
     },
     decorBars: {
         width: 38,
