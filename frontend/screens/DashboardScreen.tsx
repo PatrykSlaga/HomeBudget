@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, G } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import LeftSidebar, { PeriodFilter } from '../components/LeftSidebar';
@@ -17,8 +17,10 @@ import RightSidebar from '../components/RightSidebar';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Category } from '../../backend/models/Category';
 import { Expense } from '../../backend/models/Expense';
+import { Income } from '../../backend/models/Income';
 import { CategoryService } from '../../backend/services/categoryService';
 import { ExpenseService } from '../../backend/services/expenseService';
+import { IncomeService } from '../../backend/services/incomeService';
 
 type ExpenseCategory = {
     id: string;
@@ -26,8 +28,6 @@ type ExpenseCategory = {
     amount: number;
     color: string;
 };
-
-const INCOME_TOTAL = 1583.0;
 
 function formatCurrency(value: number) {
     return `${value.toFixed(2).replace('.', ',')}zł`;
@@ -169,23 +169,28 @@ export default function DashboardScreen() {
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [incomes, setIncomes] = useState<Income[]>([]);
 
     const [leftSidebarVisible, setLeftSidebarVisible] = useState(false);
     const [rightSidebarVisible, setRightSidebarVisible] = useState(false);
 
     const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('all');
 
-    const loadDashboardData = async () => {
+    const loadDashboardData = useCallback(async () => {
         const loadedCategories = await CategoryService.getAll();
         const loadedExpenses = ExpenseService.getAll();
+        const loadedIncomes = IncomeService.getAll();
 
         setCategories(loadedCategories);
         setExpenses(loadedExpenses);
-    };
-
-    useEffect(() => {
-        loadDashboardData();
+        setIncomes(loadedIncomes);
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadDashboardData();
+        }, [loadDashboardData])
+    );
 
     const today = new Date().toISOString().slice(0, 10);
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -203,6 +208,20 @@ export default function DashboardScreen() {
             return expense.expenseDate.startsWith(currentMonth);
         });
     }, [expenses, selectedPeriod, today, currentMonth]);
+
+    const filteredIncomes = useMemo(() => {
+        return incomes.filter(income => {
+            if (selectedPeriod === 'all') {
+                return true;
+            }
+
+            if (selectedPeriod === 'day') {
+                return income.incomeDate.startsWith(today);
+            }
+
+            return income.incomeDate.startsWith(currentMonth);
+        });
+    }, [incomes, selectedPeriod, today, currentMonth]);
 
     const chartCategories = useMemo<ExpenseCategory[]>(() => {
         return categories.map(category => {
@@ -226,7 +245,14 @@ export default function DashboardScreen() {
         );
     }, [filteredExpenses]);
 
-    const balance = INCOME_TOTAL - expenseTotal;
+    const incomeTotal = useMemo(() => {
+        return filteredIncomes.reduce(
+            (sum, income) => sum + income.amount,
+            0
+        );
+    }, [filteredIncomes]);
+
+    const balance = incomeTotal - expenseTotal;
 
     const openCategoryScreen = (category: Category) => {
         navigation.navigate('CategoryExpenses', {
@@ -236,30 +262,8 @@ export default function DashboardScreen() {
         });
     };
 
-    const addDemoExpense = async () => {
-        if (categories.length === 0) {
-            console.log('Brak kategorii — nie można dodać wydatku testowego.');
-            return;
-        }
-
-        const randomCategory =
-            categories[Math.floor(Math.random() * categories.length)];
-
-        const amount = Math.floor(Math.random() * 120) + 30;
-
-        ExpenseService.add({
-            id: Date.now().toString(),
-            userId: 'user1',
-            categoryId: randomCategory.id,
-            amount,
-            title: `Wydatek testowy - ${randomCategory.name}`,
-            note: 'Dodany z przycisku plus',
-            expenseDate: new Date().toISOString(),
-            paymentMethod: 'cash',
-            createdAt: new Date().toISOString(),
-        });
-
-        await loadDashboardData();
+    const openAddTransactionScreen = (mode: 'income' | 'expense') => {
+        navigation.navigate('AddTransaction', { mode });
     };
 
     return (
@@ -276,7 +280,7 @@ export default function DashboardScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <DonutChart
-                        incomeTotal={INCOME_TOTAL}
+                        incomeTotal={incomeTotal}
                         expenseTotal={expenseTotal}
                         categories={chartCategories}
                     />
@@ -294,13 +298,16 @@ export default function DashboardScreen() {
                     </View>
 
                     <View style={styles.actionRow}>
-                        <Pressable style={styles.minusButton}>
+                        <Pressable
+                            style={styles.minusButton}
+                            onPress={() => openAddTransactionScreen('expense')}
+                        >
                             <Text style={styles.minusText}>−</Text>
                         </Pressable>
 
                         <Pressable
                             style={styles.plusButton}
-                            onPress={addDemoExpense}
+                            onPress={() => openAddTransactionScreen('income')}
                         >
                             <Text style={styles.plusText}>+</Text>
                         </Pressable>

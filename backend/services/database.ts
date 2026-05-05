@@ -36,6 +36,15 @@ export const initDatabase = () => {
             createdAt TEXT,
             FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE
         );
+        
+        CREATE TABLE IF NOT EXISTS incomes (
+            id TEXT PRIMARY KEY,
+            userId TEXT,
+            amount REAL,
+            title TEXT,
+            incomeDate TEXT,
+            createdAt TEXT
+        );
 
         CREATE TABLE IF NOT EXISTS budgets (
             id TEXT PRIMARY KEY,
