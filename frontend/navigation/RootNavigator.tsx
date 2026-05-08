@@ -22,6 +22,9 @@ export type RootStackParamList = {
     AddTransaction: {
         mode: TransactionMode;
     };
+    AddTransaction: {
+        mode: TransactionMode;
+    };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();

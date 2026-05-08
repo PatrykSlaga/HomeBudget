@@ -112,6 +112,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                 expenseDate: trimmedDate,
                 paymentMethod: 'cash',
                 createdAt: now,
+                hiddenInCategory: 0,
             });
         }
 
