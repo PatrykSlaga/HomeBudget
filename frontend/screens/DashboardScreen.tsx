@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, G } from 'react-native-svg';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import LeftSidebar, { PeriodFilter } from '../components/LeftSidebar';
@@ -17,8 +17,10 @@ import RightSidebar from '../components/RightSidebar';
 import type { RootStackParamList } from '../navigation/RootNavigator';
 import { Category } from '../../backend/models/Category';
 import { Expense } from '../../backend/models/Expense';
+import { Income } from '../../backend/models/Income';
 import { CategoryService } from '../../backend/services/categoryService';
 import { ExpenseService } from '../../backend/services/expenseService';
+import { IncomeService } from '../../backend/services/incomeService';
 
 type ExpenseCategory = {
     id: string;
@@ -26,8 +28,6 @@ type ExpenseCategory = {
     amount: number;
     color: string;
 };
-
-const INCOME_TOTAL = 1583.0;
 
 function formatCurrency(value: number) {
     return `${value.toFixed(2).replace('.', ',')}zł`;
@@ -58,17 +58,6 @@ function AppHeader({
             </View>
 
             <View style={styles.headerRight}>
-                <Pressable style={styles.headerIcon}>
-                    <View style={styles.searchCircle} />
-                    <View style={styles.searchHandle} />
-                </Pressable>
-
-                <Pressable style={styles.switchIcon}>
-                    <View style={styles.switchTrack}>
-                        <View style={styles.switchThumb} />
-                    </View>
-                </Pressable>
-
                 <Pressable
                     style={styles.moreButton}
                     onPress={onOpenRightSidebar}
@@ -119,7 +108,7 @@ function DonutChart({
                         cx={size / 2}
                         cy={size / 2}
                         r={radius}
-                        stroke="#b9e0a4"
+                        stroke="#E5E7EB"
                         strokeWidth={strokeWidth}
                         fill="none"
                     />
@@ -169,23 +158,28 @@ export default function DashboardScreen() {
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [incomes, setIncomes] = useState<Income[]>([]);
 
     const [leftSidebarVisible, setLeftSidebarVisible] = useState(false);
     const [rightSidebarVisible, setRightSidebarVisible] = useState(false);
 
     const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('all');
 
-    const loadDashboardData = async () => {
+    const loadDashboardData = useCallback(async () => {
         const loadedCategories = await CategoryService.getAll();
         const loadedExpenses = ExpenseService.getAll();
+        const loadedIncomes = IncomeService.getAll();
 
         setCategories(loadedCategories);
         setExpenses(loadedExpenses);
-    };
-
-    useEffect(() => {
-        loadDashboardData();
+        setIncomes(loadedIncomes);
     }, []);
+
+    useFocusEffect(
+        useCallback(() => {
+            void loadDashboardData();
+        }, [loadDashboardData])
+    );
 
     const today = new Date().toISOString().slice(0, 10);
     const currentMonth = new Date().toISOString().slice(0, 7);
@@ -204,6 +198,20 @@ export default function DashboardScreen() {
         });
     }, [expenses, selectedPeriod, today, currentMonth]);
 
+    const filteredIncomes = useMemo(() => {
+        return incomes.filter(income => {
+            if (selectedPeriod === 'all') {
+                return true;
+            }
+
+            if (selectedPeriod === 'day') {
+                return income.incomeDate.startsWith(today);
+            }
+
+            return income.incomeDate.startsWith(currentMonth);
+        });
+    }, [incomes, selectedPeriod, today, currentMonth]);
+
     const chartCategories = useMemo<ExpenseCategory[]>(() => {
         return categories.map(category => {
             const amount = filteredExpenses
@@ -214,7 +222,7 @@ export default function DashboardScreen() {
                 id: category.id,
                 name: category.name,
                 amount,
-                color: category.color || '#9fd27f',
+                color: category.color || '#64748B',
             };
         });
     }, [categories, filteredExpenses]);
@@ -226,40 +234,25 @@ export default function DashboardScreen() {
         );
     }, [filteredExpenses]);
 
-    const balance = INCOME_TOTAL - expenseTotal;
+    const incomeTotal = useMemo(() => {
+        return filteredIncomes.reduce(
+            (sum, income) => sum + income.amount,
+            0
+        );
+    }, [filteredIncomes]);
+
+    const balance = incomeTotal - expenseTotal;
 
     const openCategoryScreen = (category: Category) => {
         navigation.navigate('CategoryExpenses', {
             categoryId: category.id,
             categoryName: category.name,
-            categoryIcon: category.icon,
+            categoryColor: category.color,
         });
     };
 
-    const addDemoExpense = async () => {
-        if (categories.length === 0) {
-            console.log('Brak kategorii — nie można dodać wydatku testowego.');
-            return;
-        }
-
-        const randomCategory =
-            categories[Math.floor(Math.random() * categories.length)];
-
-        const amount = Math.floor(Math.random() * 120) + 30;
-
-        ExpenseService.add({
-            id: Date.now().toString(),
-            userId: 'user1',
-            categoryId: randomCategory.id,
-            amount,
-            title: `Wydatek testowy - ${randomCategory.name}`,
-            note: 'Dodany z przycisku plus',
-            expenseDate: new Date().toISOString(),
-            paymentMethod: 'cash',
-            createdAt: new Date().toISOString(),
-        });
-
-        await loadDashboardData();
+    const openAddTransactionScreen = (mode: 'income' | 'expense') => {
+        navigation.navigate('AddTransaction', { mode });
     };
 
     return (
@@ -276,7 +269,7 @@ export default function DashboardScreen() {
                     showsVerticalScrollIndicator={false}
                 >
                     <DonutChart
-                        incomeTotal={INCOME_TOTAL}
+                        incomeTotal={incomeTotal}
                         expenseTotal={expenseTotal}
                         categories={chartCategories}
                     />
@@ -294,13 +287,16 @@ export default function DashboardScreen() {
                     </View>
 
                     <View style={styles.actionRow}>
-                        <Pressable style={styles.minusButton}>
+                        <Pressable
+                            style={styles.minusButton}
+                            onPress={() => openAddTransactionScreen('expense')}
+                        >
                             <Text style={styles.minusText}>−</Text>
                         </Pressable>
 
                         <Pressable
                             style={styles.plusButton}
-                            onPress={addDemoExpense}
+                            onPress={() => openAddTransactionScreen('income')}
                         >
                             <Text style={styles.plusText}>+</Text>
                         </Pressable>
@@ -365,51 +361,6 @@ const styles = StyleSheet.create({
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    headerIcon: {
-        width: 30,
-        height: 30,
-        marginLeft: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    searchCircle: {
-        width: 15,
-        height: 15,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#ffffff',
-    },
-    searchHandle: {
-        width: 8,
-        height: 2,
-        backgroundColor: '#ffffff',
-        borderRadius: 2,
-        transform: [{ rotate: '45deg' }],
-        marginTop: -1,
-        marginLeft: 13,
-    },
-    switchIcon: {
-        width: 38,
-        height: 30,
-        marginLeft: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    switchTrack: {
-        width: 30,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: '#ffffff',
-        justifyContent: 'center',
-        paddingHorizontal: 2,
-    },
-    switchThumb: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: '#74bb4e',
-        alignSelf: 'flex-end',
     },
     moreButton: {
         width: 24,

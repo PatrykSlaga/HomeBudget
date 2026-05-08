@@ -8,4 +8,5 @@ export interface Expense {
   expenseDate: string;
   paymentMethod: string;
   createdAt: string;
+  hiddenInCategory?: number;
 }

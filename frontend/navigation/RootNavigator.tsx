@@ -5,7 +5,10 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import MainTabs from './MainTabs';
 import CategoryExpensesScreen from '../screens/CategoryExpensesScreen';
+import AddTransactionScreen from '../screens/AddTransactionScreen';
 import { User } from '../../backend/models/User';
+
+export type TransactionMode = 'income' | 'expense';
 
 export type RootStackParamList = {
     Login: undefined;
@@ -14,7 +17,10 @@ export type RootStackParamList = {
     CategoryExpenses: {
         categoryId: string;
         categoryName: string;
-        categoryIcon: string;
+        categoryColor: string;
+    };
+    AddTransaction: {
+        mode: TransactionMode;
     };
 };
 
@@ -51,9 +57,15 @@ export default function RootNavigator() {
             ) : (
                 <>
                     <Stack.Screen name="MainTabs" component={MainTabs} />
+
                     <Stack.Screen
                         name="CategoryExpenses"
                         component={CategoryExpensesScreen}
+                    />
+
+                    <Stack.Screen
+                        name="AddTransaction"
+                        component={AddTransactionScreen}
                     />
                 </>
             )}
