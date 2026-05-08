@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
+    Alert, Platform,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { RootStackParamList } from '../navigation/RootNavigator';
 import { Category } from '../../backend/models/Category';
 import { CategoryService } from '../../backend/services/categoryService';
@@ -41,6 +41,8 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
     const [transactionDate, setTransactionDate] = useState(getTodayDate());
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [date, setDate] = useState(new Date());
 
     useEffect(() => {
         const loadCategories = async () => {
@@ -63,6 +65,19 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
     const screenTitle = isIncomeMode ? 'Dodaj pieniądze' : 'Dodaj wydatek';
     const screenSubtitle = isIncomeMode ? 'Przyrost salda' : 'Zmniejszenie salda';
     const saveButtonLabel = isIncomeMode ? 'Zapisz wpływ' : 'Zapisz wydatek';
+
+    const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        // Na Androidzie wybór daty zamyka picker automatycznie
+        if (Platform.OS === 'android') {
+            setShowDatePicker(false);
+        }
+
+        if (selectedDate) {
+            setDate(selectedDate);
+            // Aktualizujemy transactionDate w formacie tekstowym do zapisu w bazie
+            setTransactionDate(selectedDate.toISOString().slice(0, 10));
+        }
+    };
 
     const handleSave = () => {
         const amount = parseAmount(amountText);
@@ -178,13 +193,27 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                         />
 
                         <Text style={styles.label}>Data</Text>
-                        <TextInput
-                            value={transactionDate}
-                            onChangeText={setTransactionDate}
-                            placeholder="RRRR-MM-DD"
-                            placeholderTextColor="#8da382"
-                            style={styles.input}
-                        />
+                        <Pressable onPress={() => setShowDatePicker(true)}>
+                            <View pointerEvents="none">
+                                <TextInput
+                                    value={transactionDate}
+                                    placeholder="RRRR-MM-DD"
+                                    placeholderTextColor="#8da382"
+                                    style={styles.input}
+                                    editable={false} // Blokujemy ręczne pisanie
+                                />
+                            </View>
+                        </Pressable>
+
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={date}
+                                mode="date"
+                                display="default"
+                                onChange={onDateChange}
+                                maximumDate={new Date()} // KLUCZOWE: Blokuje przyszłe daty w kalendarzu!
+                            />
+                        )}
 
                         {!isIncomeMode ? (
                             <View style={styles.categorySection}>
