@@ -17,7 +17,10 @@ export type RootStackParamList = {
     CategoryExpenses: {
         categoryId: string;
         categoryName: string;
-        categoryIcon: string;
+        categoryColor: string;
+    };
+    AddTransaction: {
+        mode: TransactionMode;
     };
     AddTransaction: {
         mode: TransactionMode;

@@ -58,17 +58,6 @@ function AppHeader({
             </View>
 
             <View style={styles.headerRight}>
-                <Pressable style={styles.headerIcon}>
-                    <View style={styles.searchCircle} />
-                    <View style={styles.searchHandle} />
-                </Pressable>
-
-                <Pressable style={styles.switchIcon}>
-                    <View style={styles.switchTrack}>
-                        <View style={styles.switchThumb} />
-                    </View>
-                </Pressable>
-
                 <Pressable
                     style={styles.moreButton}
                     onPress={onOpenRightSidebar}
@@ -119,7 +108,7 @@ function DonutChart({
                         cx={size / 2}
                         cy={size / 2}
                         r={radius}
-                        stroke="#b9e0a4"
+                        stroke="#E5E7EB"
                         strokeWidth={strokeWidth}
                         fill="none"
                     />
@@ -233,7 +222,7 @@ export default function DashboardScreen() {
                 id: category.id,
                 name: category.name,
                 amount,
-                color: category.color || '#9fd27f',
+                color: category.color || '#64748B',
             };
         });
     }, [categories, filteredExpenses]);
@@ -258,7 +247,7 @@ export default function DashboardScreen() {
         navigation.navigate('CategoryExpenses', {
             categoryId: category.id,
             categoryName: category.name,
-            categoryIcon: category.icon,
+            categoryColor: category.color,
         });
     };
 
@@ -372,51 +361,6 @@ const styles = StyleSheet.create({
     headerRight: {
         flexDirection: 'row',
         alignItems: 'center',
-    },
-    headerIcon: {
-        width: 30,
-        height: 30,
-        marginLeft: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    searchCircle: {
-        width: 15,
-        height: 15,
-        borderRadius: 8,
-        borderWidth: 2,
-        borderColor: '#ffffff',
-    },
-    searchHandle: {
-        width: 8,
-        height: 2,
-        backgroundColor: '#ffffff',
-        borderRadius: 2,
-        transform: [{ rotate: '45deg' }],
-        marginTop: -1,
-        marginLeft: 13,
-    },
-    switchIcon: {
-        width: 38,
-        height: 30,
-        marginLeft: 8,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    switchTrack: {
-        width: 30,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: '#ffffff',
-        justifyContent: 'center',
-        paddingHorizontal: 2,
-    },
-    switchThumb: {
-        width: 12,
-        height: 12,
-        borderRadius: 6,
-        backgroundColor: '#74bb4e',
-        alignSelf: 'flex-end',
     },
     moreButton: {
         width: 24,

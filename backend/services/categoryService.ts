@@ -8,72 +8,72 @@ const DEFAULT_CATEGORIES: Category[] = [
     id: 'cat_home',
     userId: DEFAULT_USER_ID,
     name: 'Dom',
-    icon: '🏠',
-    color: '#9fd27f',
+    icon: '',
+    color: '#EF4444',
     type: 'expense',
   },
   {
     id: 'cat_car',
     userId: DEFAULT_USER_ID,
     name: 'Samochód',
-    icon: '🚗',
-    color: '#8ccf67',
+    icon: '',
+    color: '#F97316',
     type: 'expense',
   },
   {
     id: 'cat_transport',
     userId: DEFAULT_USER_ID,
     name: 'Transport',
-    icon: '🚌',
-    color: '#b2de97',
+    icon: '',
+    color: '#F59E0B',
     type: 'expense',
   },
   {
     id: 'cat_clothes',
     userId: DEFAULT_USER_ID,
     name: 'Ubrania',
-    icon: '👕',
-    color: '#7fc85a',
+    icon: '',
+    color: '#8B5CF6',
     type: 'expense',
   },
   {
     id: 'cat_bills',
     userId: DEFAULT_USER_ID,
     name: 'Rachunki',
-    icon: '💡',
-    color: '#a4db87',
+    icon: '',
+    color: '#3B82F6',
     type: 'expense',
   },
   {
     id: 'cat_pets',
     userId: DEFAULT_USER_ID,
     name: 'Zwierzęta',
-    icon: '🐾',
-    color: '#8fcf73',
+    icon: '',
+    color: '#EC4899',
     type: 'expense',
   },
   {
     id: 'cat_health',
     userId: DEFAULT_USER_ID,
     name: 'Zdrowie',
-    icon: '💊',
-    color: '#77c65a',
+    icon: '',
+    color: '#10B981',
     type: 'expense',
   },
   {
     id: 'cat_food',
     userId: DEFAULT_USER_ID,
     name: 'Żywność',
-    icon: '🍎',
-    color: '#96d178',
+    icon: '',
+    color: '#22C55E',
     type: 'expense',
   },
   {
     id: 'cat_entertainment',
     userId: DEFAULT_USER_ID,
     name: 'Rozrywka',
-    icon: '🎮',
-    color: '#aadf8f',
+    icon: '',
+    color: '#06B6D4',
     type: 'expense',
   },
 ];
@@ -85,18 +85,18 @@ export const CategoryService = {
 
   async add(c: Category) {
     db.runSync(
-        `INSERT INTO categories 
-             (id, userId, name, icon, color, type) 
-             VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO categories
+           (id, userId, name, icon, color, type)
+         VALUES (?, ?, ?, ?, ?, ?)`,
         [c.id, c.userId, c.name, c.icon, c.color, c.type]
     );
   },
 
   async update(c: Category) {
     db.runSync(
-        `UPDATE categories 
-             SET name = ?, icon = ?, color = ?, type = ? 
-             WHERE id = ?`,
+        `UPDATE categories
+         SET name = ?, icon = ?, color = ?, type = ?
+         WHERE id = ?`,
         [c.name, c.icon, c.color, c.type, c.id]
     );
   },
@@ -117,6 +117,13 @@ export const CategoryService = {
     for (const category of DEFAULT_CATEGORIES) {
       if (!existingIds.has(category.id)) {
         await CategoryService.add(category);
+      } else {
+        db.runSync(
+            `UPDATE categories
+                 SET icon = ?, color = ?, type = ?
+                 WHERE id = ?`,
+            [category.icon, category.color, category.type, category.id]
+        );
       }
     }
 

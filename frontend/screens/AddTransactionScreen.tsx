@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
-import { RootStackParamList } from "../navigation/RootNavigator";
+import { RootStackParamList } from '../navigation/RootNavigator';
 import { Category } from '../../backend/models/Category';
 import { CategoryService } from '../../backend/services/categoryService';
 import { ExpenseService } from '../../backend/services/expenseService';
@@ -20,6 +20,7 @@ import { IncomeService } from '../../backend/services/incomeService';
 type Props = NativeStackScreenProps<RootStackParamList, 'AddTransaction'>;
 
 const DEFAULT_USER_ID = 'user1';
+const FALLBACK_CATEGORY_COLOR = '#64748B';
 
 function getTodayDate() {
     return new Date().toISOString().slice(0, 10);
@@ -111,6 +112,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                 expenseDate: trimmedDate,
                 paymentMethod: 'cash',
                 createdAt: now,
+                hiddenInCategory: 0,
             });
         }
 
@@ -196,25 +198,25 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                                     <View style={styles.categoryGrid}>
                                         {categories.map(category => {
                                             const selected = category.id === selectedCategoryId;
+                                            const categoryColor = category.color || FALLBACK_CATEGORY_COLOR;
 
                                             return (
                                                 <Pressable
                                                     key={category.id}
                                                     style={[
                                                         styles.categoryButton,
-                                                        selected && styles.categoryButtonSelected,
+                                                        {
+                                                            borderColor: categoryColor,
+                                                            backgroundColor: selected ? categoryColor : '#ffffff',
+                                                        },
                                                     ]}
                                                     onPress={() => setSelectedCategoryId(category.id)}
                                                 >
-                                                    <Text style={styles.categoryIcon}>
-                                                        {category.icon}
-                                                    </Text>
-
                                                     <Text
                                                         numberOfLines={1}
                                                         style={[
                                                             styles.categoryName,
-                                                            selected && styles.categoryNameSelected,
+                                                            { color: selected ? '#ffffff' : categoryColor },
                                                         ]}
                                                     >
                                                         {category.name}
@@ -226,8 +228,13 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                                 )}
 
                                 {selectedCategory ? (
-                                    <Text style={styles.selectedCategoryText}>
-                                        Wybrano: {selectedCategory.icon} {selectedCategory.name}
+                                    <Text
+                                        style={[
+                                            styles.selectedCategoryText,
+                                            { color: selectedCategory.color || FALLBACK_CATEGORY_COLOR },
+                                        ]}
+                                    >
+                                        Wybrano: {selectedCategory.name}
                                     </Text>
                                 ) : null}
                             </View>
@@ -356,38 +363,23 @@ const styles = StyleSheet.create({
     },
     categoryButton: {
         width: '31%',
-        minHeight: 76,
+        minHeight: 58,
         borderRadius: 14,
-        borderWidth: 1,
-        borderColor: '#9fd27f',
-        backgroundColor: '#f7fbf4',
+        borderWidth: 1.5,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 6,
         paddingVertical: 8,
     },
-    categoryButtonSelected: {
-        backgroundColor: '#74bb4e',
-        borderColor: '#4f9a36',
-    },
-    categoryIcon: {
-        fontSize: 23,
-        marginBottom: 4,
-    },
     categoryName: {
-        fontSize: 11,
-        color: '#4f9a36',
-        fontWeight: '700',
+        fontSize: 12,
+        fontWeight: '800',
         textAlign: 'center',
-    },
-    categoryNameSelected: {
-        color: '#ffffff',
     },
     selectedCategoryText: {
         marginTop: 10,
-        color: '#4f9a36',
         fontSize: 13,
-        fontWeight: '700',
+        fontWeight: '800',
     },
     emptyCategoryText: {
         color: '#ba120f',

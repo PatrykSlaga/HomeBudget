@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+    Alert,
     FlatList,
     Pressable,
     StyleSheet,
@@ -15,6 +16,8 @@ import { ExpenseService } from '../../backend/services/expenseService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CategoryExpenses'>;
 
+const FALLBACK_CATEGORY_COLOR = '#74bb4e';
+
 function formatCurrency(value: number) {
     return `${value.toFixed(2).replace('.', ',')} zł`;
 }
@@ -24,13 +27,20 @@ function formatDate(date: string) {
 }
 
 export default function CategoryExpensesScreen({ route, navigation }: Props) {
-    const { categoryId, categoryName, categoryIcon } = route.params;
+    const { categoryId, categoryName, categoryColor } = route.params;
+    const accentColor = categoryColor || FALLBACK_CATEGORY_COLOR;
 
-    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+    const [visibleExpenses, setVisibleExpenses] = useState<Expense[]>([]);
 
     const loadExpenses = () => {
-        const data = ExpenseService.getByCategoryId(categoryId);
-        setExpenses(data);
+        const allCategoryExpenses = ExpenseService.getByCategoryId(categoryId, {
+            includeHidden: true,
+        });
+        const visibleCategoryExpenses = ExpenseService.getByCategoryId(categoryId);
+
+        setAllExpenses(allCategoryExpenses);
+        setVisibleExpenses(visibleCategoryExpenses);
     };
 
     useEffect(() => {
@@ -38,21 +48,47 @@ export default function CategoryExpensesScreen({ route, navigation }: Props) {
     }, [categoryId]);
 
     const total = useMemo(() => {
-        return expenses.reduce((sum, expense) => sum + expense.amount, 0);
-    }, [expenses]);
+        return allExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+    }, [allExpenses]);
 
     const average = useMemo(() => {
-        if (expenses.length === 0) {
+        if (allExpenses.length === 0) {
             return 0;
         }
 
-        return total / expenses.length;
-    }, [expenses, total]);
+        return total / allExpenses.length;
+    }, [allExpenses, total]);
+
+    const handleHideExpense = (expense: Expense) => {
+        Alert.alert(
+            'Usunąć wpis z listy?',
+            'Wpis zniknie z listy tej kategorii, ale kwota dalej zostanie uwzględniona w saldzie i wykresie.',
+            [
+                {
+                    text: 'Anuluj',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Usuń z listy',
+                    style: 'destructive',
+                    onPress: () => {
+                        ExpenseService.hideFromCategoryList(expense.id);
+                        setVisibleExpenses(prevExpenses =>
+                            prevExpenses.filter(item => item.id !== expense.id)
+                        );
+                    },
+                },
+            ]
+        );
+    };
 
     return (
-        <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <SafeAreaView
+            style={[styles.safeArea, { backgroundColor: accentColor }]}
+            edges={['top']}
+        >
             <View style={styles.container}>
-                <View style={styles.header}>
+                <View style={[styles.header, { backgroundColor: accentColor }]}>
                     <Pressable
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
@@ -62,7 +98,7 @@ export default function CategoryExpensesScreen({ route, navigation }: Props) {
 
                     <View style={styles.headerTitleBox}>
                         <Text style={styles.headerTitle}>
-                            {categoryIcon} {categoryName}
+                            {categoryName}
                         </Text>
                         <Text style={styles.headerSubtitle}>
                             Wydatki kategorii
@@ -70,49 +106,49 @@ export default function CategoryExpensesScreen({ route, navigation }: Props) {
                     </View>
                 </View>
 
-                <View style={styles.summaryBox}>
+                <View style={[styles.summaryBox, { borderColor: accentColor }]}>
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Suma</Text>
-                        <Text style={styles.summaryValue}>
+                        <Text style={[styles.summaryLabel, { color: accentColor }]}>Suma</Text>
+                        <Text style={[styles.summaryValue, { color: accentColor }]}>
                             {formatCurrency(total)}
                         </Text>
                     </View>
 
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Liczba</Text>
-                        <Text style={styles.summaryValue}>
-                            {expenses.length}
+                        <Text style={[styles.summaryLabel, { color: accentColor }]}>Liczba</Text>
+                        <Text style={[styles.summaryValue, { color: accentColor }]}>
+                            {allExpenses.length}
                         </Text>
                     </View>
 
                     <View style={styles.summaryItem}>
-                        <Text style={styles.summaryLabel}>Średnio</Text>
-                        <Text style={styles.summaryValue}>
+                        <Text style={[styles.summaryLabel, { color: accentColor }]}>Średnio</Text>
+                        <Text style={[styles.summaryValue, { color: accentColor }]}>
                             {formatCurrency(average)}
                         </Text>
                     </View>
                 </View>
 
-                <Text style={styles.sectionTitle}>Lista wydatków</Text>
+                <Text style={[styles.sectionTitle, { color: accentColor }]}>Lista wydatków</Text>
 
                 <FlatList
-                    data={expenses}
+                    data={visibleExpenses}
                     keyExtractor={item => item.id}
                     contentContainerStyle={styles.listContent}
                     ListEmptyComponent={
-                        <View style={styles.emptyBox}>
-                            <Text style={styles.emptyTitle}>
-                                Brak wydatków
+                        <View style={[styles.emptyBox, { borderColor: accentColor }]}>
+                            <Text style={[styles.emptyTitle, { color: accentColor }]}>
+                                Brak wydatków na liście
                             </Text>
                             <Text style={styles.emptyText}>
-                                W tej kategorii nie ma jeszcze zapisanych wydatków.
+                                W tej kategorii nie ma widocznych wpisów. Ukryte wpisy nadal są liczone w saldzie.
                             </Text>
                         </View>
                     }
                     renderItem={({ item }) => (
-                        <View style={styles.expenseCard}>
+                        <View style={[styles.expenseCard, { borderColor: accentColor }]}>
                             <View style={styles.expenseHeader}>
-                                <Text style={styles.expenseTitle}>
+                                <Text style={[styles.expenseTitle, { color: accentColor }]}>
                                     {item.title}
                                 </Text>
 
@@ -134,6 +170,15 @@ export default function CategoryExpensesScreen({ route, navigation }: Props) {
                                     Notatka: {item.note}
                                 </Text>
                             ) : null}
+
+                            <Pressable
+                                style={[styles.hideButton, { borderColor: accentColor }]}
+                                onPress={() => handleHideExpense(item)}
+                            >
+                                <Text style={[styles.hideButtonText, { color: accentColor }]}>
+                                    Usuń z listy
+                                </Text>
+                            </Pressable>
                         </View>
                     )}
                 />
@@ -190,7 +235,7 @@ const styles = StyleSheet.create({
         margin: 16,
         backgroundColor: '#ffffff',
         borderRadius: 14,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#9fd27f',
         padding: 14,
         flexDirection: 'row',
@@ -224,7 +269,7 @@ const styles = StyleSheet.create({
     expenseCard: {
         backgroundColor: '#ffffff',
         borderRadius: 12,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#9fd27f',
         padding: 14,
         marginBottom: 10,
@@ -261,10 +306,23 @@ const styles = StyleSheet.create({
         color: '#64748b',
         marginTop: 4,
     },
+    hideButton: {
+        alignSelf: 'flex-end',
+        marginTop: 12,
+        borderWidth: 1.5,
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+        backgroundColor: '#ffffff',
+    },
+    hideButtonText: {
+        fontSize: 12,
+        fontWeight: '800',
+    },
     emptyBox: {
         backgroundColor: '#ffffff',
         borderRadius: 12,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: '#9fd27f',
         padding: 18,
         alignItems: 'center',
@@ -279,5 +337,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#64748b',
         textAlign: 'center',
+        lineHeight: 19,
     },
 });

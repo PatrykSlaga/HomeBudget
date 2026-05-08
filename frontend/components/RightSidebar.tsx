@@ -19,6 +19,7 @@ type RightSidebarProps = {
 };
 
 const SIDEBAR_WIDTH = 118;
+const FALLBACK_CATEGORY_COLOR = '#64748B';
 
 export default function RightSidebar({
                                          visible,
@@ -60,7 +61,7 @@ export default function RightSidebar({
                         style={styles.sectionButton}
                         onPress={() => setCategoriesExpanded(prev => !prev)}
                     >
-                        <Text style={styles.categoryIcon}>▣</Text>
+                        <Text style={styles.sectionIcon}>▣</Text>
 
                         <Text style={styles.sectionLabel}>
                             Kategorie
@@ -76,23 +77,33 @@ export default function RightSidebar({
                             style={styles.categoryList}
                             showsVerticalScrollIndicator={false}
                         >
-                            {categories.map(category => (
-                                <Pressable
-                                    key={category.id}
-                                    style={styles.categoryButton}
-                                    onPress={() => {
-                                        onClose();
-                                        onOpenCategory(category);
-                                    }}
-                                >
-                                    <Text
-                                        numberOfLines={1}
-                                        style={styles.categoryText}
+                            {categories.map(category => {
+                                const categoryColor = category.color || FALLBACK_CATEGORY_COLOR;
+
+                                return (
+                                    <Pressable
+                                        key={category.id}
+                                        style={[
+                                            styles.categoryButton,
+                                            { borderColor: categoryColor },
+                                        ]}
+                                        onPress={() => {
+                                            onClose();
+                                            onOpenCategory(category);
+                                        }}
                                     >
-                                        {category.name}
-                                    </Text>
-                                </Pressable>
-                            ))}
+                                        <Text
+                                            numberOfLines={1}
+                                            style={[
+                                                styles.categoryText,
+                                                { color: categoryColor },
+                                            ]}
+                                        >
+                                            {category.name}
+                                        </Text>
+                                    </Pressable>
+                                );
+                            })}
                         </ScrollView>
                     ) : null}
 
@@ -128,7 +139,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingBottom: 8,
     },
-    categoryIcon: {
+    sectionIcon: {
         fontSize: 44,
         lineHeight: 48,
         color: '#67b957',
@@ -156,16 +167,14 @@ const styles = StyleSheet.create({
         width: '100%',
         borderTopWidth: 1,
         borderBottomWidth: 1,
-        borderColor: '#7abf61',
-        backgroundColor: '#eef8e8',
+        backgroundColor: '#ffffff',
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 4,
     },
     categoryText: {
         fontSize: 11,
-        color: '#4fa83b',
-        fontWeight: '500',
+        fontWeight: '800',
     },
     currencyBox: {
         marginTop: 16,
