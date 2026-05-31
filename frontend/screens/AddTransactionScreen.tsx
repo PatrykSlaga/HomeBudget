@@ -7,6 +7,7 @@ import {
     Text,
     TextInput,
     View,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -16,6 +17,8 @@ import { Category } from '../../backend/models/Category';
 import { CategoryService } from '../../backend/services/categoryService';
 import { ExpenseService } from '../../backend/services/expenseService';
 import { IncomeService } from '../../backend/services/incomeService';
+import { useUser } from '../hooks/useUser';
+import { convertToPLN, getCurrencyCode } from '../../backend/services/nbpService';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AddTransaction'>;
 
@@ -33,8 +36,10 @@ function parseAmount(value: string) {
 
 export default function AddTransactionScreen({ route, navigation }: Props) {
     const { mode } = route.params;
+    const { user } = useUser();
 
     const isIncomeMode = mode === 'income';
+    const userCurrencyCode = getCurrencyCode(user?.currency || 'PLN');
 
     const [title, setTitle] = useState('');
     const [amountText, setAmountText] = useState('');
@@ -43,6 +48,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [date, setDate] = useState(new Date());
+    const [isConverting, setIsConverting] = useState(false);
 
     useEffect(() => {
         const loadCategories = async () => {
@@ -67,19 +73,17 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
     const saveButtonLabel = isIncomeMode ? 'Zapisz wpływ' : 'Zapisz wydatek';
 
     const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-        // Na Androidzie wybór daty zamyka picker automatycznie
         if (Platform.OS === 'android') {
             setShowDatePicker(false);
         }
 
         if (selectedDate) {
             setDate(selectedDate);
-            // Aktualizujemy transactionDate w formacie tekstowym do zapisu w bazie
             setTransactionDate(selectedDate.toISOString().slice(0, 10));
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const amount = parseAmount(amountText);
         const trimmedTitle = title.trim();
         const trimmedDate = transactionDate.trim();
@@ -104,6 +108,21 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
             return;
         }
 
+        setIsConverting(true);
+        let finalAmountInPLN = amount;
+
+        try {
+            // Przeliczamy na PLN przed zapisem do bazy danych
+            finalAmountInPLN = await convertToPLN(amount, user?.currency || 'PLN');
+        } catch (error) {
+            Alert.alert(
+                'Błąd pobierania kursu',
+                'Nie udało się połączyć z API NBP. Sprawdź połączenie internetowe.'
+            );
+            setIsConverting(false);
+            return;
+        }
+
         const now = new Date().toISOString();
         const id = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
 
@@ -111,7 +130,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
             IncomeService.add({
                 id,
                 userId: DEFAULT_USER_ID,
-                amount,
+                amount: finalAmountInPLN,
                 title: trimmedTitle,
                 incomeDate: trimmedDate,
                 createdAt: now,
@@ -121,9 +140,9 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                 id,
                 userId: DEFAULT_USER_ID,
                 categoryId: selectedCategoryId as string,
-                amount,
+                amount: finalAmountInPLN,
                 title: trimmedTitle,
-                note: '',
+                note: userCurrencyCode !== 'PLN' ? `Oryginalnie: ${amount} ${userCurrencyCode}` : '',
                 expenseDate: trimmedDate,
                 paymentMethod: 'cash',
                 createdAt: now,
@@ -131,6 +150,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
             });
         }
 
+        setIsConverting(false);
         navigation.goBack();
     };
 
@@ -141,6 +161,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                     <Pressable
                         style={styles.backButton}
                         onPress={() => navigation.goBack()}
+                        disabled={isConverting}
                     >
                         <Text style={styles.backButtonText}>‹</Text>
                     </Pressable>
@@ -173,6 +194,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                         <TextInput
                             value={title}
                             onChangeText={setTitle}
+                            editable={!isConverting}
                             placeholder={
                                 isIncomeMode
                                     ? 'np. Pensja, pożyczka, premia'
@@ -182,25 +204,26 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                             style={styles.input}
                         />
 
-                        <Text style={styles.label}>Ilość pieniędzy</Text>
+                        <Text style={styles.label}>Ilość pieniędzy ({userCurrencyCode})</Text>
                         <TextInput
                             value={amountText}
                             onChangeText={setAmountText}
-                            placeholder="np. 2500,00"
+                            editable={!isConverting}
+                            placeholder={`np. 250,00 ${userCurrencyCode}`}
                             placeholderTextColor="#8da382"
                             keyboardType="decimal-pad"
                             style={styles.input}
                         />
 
                         <Text style={styles.label}>Data</Text>
-                        <Pressable onPress={() => setShowDatePicker(true)}>
+                        <Pressable onPress={() => !isConverting && setShowDatePicker(true)}>
                             <View pointerEvents="none">
                                 <TextInput
                                     value={transactionDate}
                                     placeholder="RRRR-MM-DD"
                                     placeholderTextColor="#8da382"
                                     style={styles.input}
-                                    editable={false} // Blokujemy ręczne pisanie
+                                    editable={false}
                                 />
                             </View>
                         </Pressable>
@@ -211,7 +234,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                                 mode="date"
                                 display="default"
                                 onChange={onDateChange}
-                                maximumDate={new Date()} // KLUCZOWE: Blokuje przyszłe daty w kalendarzu!
+                                maximumDate={new Date()}
                             />
                         )}
 
@@ -232,6 +255,7 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                                             return (
                                                 <Pressable
                                                     key={category.id}
+                                                    disabled={isConverting}
                                                     style={[
                                                         styles.categoryButton,
                                                         {
@@ -273,10 +297,16 @@ export default function AddTransactionScreen({ route, navigation }: Props) {
                             style={[
                                 styles.saveButton,
                                 isIncomeMode ? styles.saveIncomeButton : styles.saveExpenseButton,
+                                isConverting && { opacity: 0.6 }
                             ]}
                             onPress={handleSave}
+                            disabled={isConverting}
                         >
-                            <Text style={styles.saveButtonText}>{saveButtonLabel}</Text>
+                            {isConverting ? (
+                                <ActivityIndicator color="#ffffff" size="small" />
+                            ) : (
+                                <Text style={styles.saveButtonText}>{saveButtonLabel}</Text>
+                            )}
                         </Pressable>
                     </View>
                 </ScrollView>

@@ -14,11 +14,24 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AuthService } from '../../backend/services/authService';
 import { User } from '../../backend/models/User';
+import { getCurrencyCode } from '../../backend/services/nbpService';
 
 type RegisterScreenProps = {
     onRegister: (user: User) => void;
     onGoToLogin: () => void;
 };
+
+// Lista walut zadeklarowana zgodnie z Twoimi wymaganiami
+const AVAILABLE_CURRENCIES = [
+    { label: 'PLN', code: 'PLN' },
+    { label: 'Euro', code: 'EUR' },
+    { label: 'Dolar', code: 'USD' },
+    { label: 'Yen', code: 'JPY' },
+    { label: 'Korona Cz.', code: 'CZK' },
+    { label: 'Won kor.', code: 'KRW' },
+    { label: 'Forint', code: 'HUF' },
+    { label: 'Frank Szw.', code: 'CHF' },
+];
 
 function AppHeader() {
     return (
@@ -43,7 +56,7 @@ export default function RegisterScreen({
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [currency, setCurrency] = useState('PLN');
+    const [currency, setCurrency] = useState('PLN'); // Przechowuje kod ISO, np. 'PLN', 'EUR'
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -54,7 +67,9 @@ export default function RegisterScreen({
 
         const trimmedName = name.trim();
         const trimmedEmail = email.trim();
-        const trimmedCurrency = currency.trim() || 'PLN';
+
+        // Przepuszczamy walutę przez nasz helper, aby upewnić się, że zapisze się czysty kod ISO (np. 'EUR')
+        const validatedCurrency = getCurrencyCode(currency);
 
         if (!trimmedName || !trimmedEmail || !password) {
             setError('Uzupełnij wszystkie wymagane pola.');
@@ -73,7 +88,7 @@ export default function RegisterScreen({
             name: trimmedName,
             email: trimmedEmail,
             password,
-            currency: trimmedCurrency,
+            currency: validatedCurrency,
         });
 
         setLoading(false);
@@ -112,6 +127,7 @@ export default function RegisterScreen({
                                 <TextInput
                                     value={name}
                                     onChangeText={setName}
+                                    editable={!loading}
                                     placeholder="Wpisz nazwę"
                                     placeholderTextColor="#4e6b42"
                                     autoCapitalize="words"
@@ -124,6 +140,7 @@ export default function RegisterScreen({
                                 <TextInput
                                     value={email}
                                     onChangeText={setEmail}
+                                    editable={!loading}
                                     placeholder="Wpisz e-mail"
                                     placeholderTextColor="#4e6b42"
                                     autoCapitalize="none"
@@ -139,6 +156,7 @@ export default function RegisterScreen({
                                 <TextInput
                                     value={password}
                                     onChangeText={setPassword}
+                                    editable={!loading}
                                     placeholder="Minimum 4 znaki"
                                     placeholderTextColor="#4e6b42"
                                     secureTextEntry
@@ -148,17 +166,34 @@ export default function RegisterScreen({
                                 />
                             </View>
 
+                            {/* Zmienione pole wyboru waluty na wygodny siatkowy Selector */}
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>Waluta</Text>
-                                <TextInput
-                                    value={currency}
-                                    onChangeText={setCurrency}
-                                    placeholder="PLN"
-                                    placeholderTextColor="#4e6b42"
-                                    autoCapitalize="characters"
-                                    maxLength={3}
-                                    style={styles.input}
-                                />
+                                <Text style={styles.label}>Domyślna waluta wprowadzania</Text>
+                                <View style={styles.currencyGrid}>
+                                    {AVAILABLE_CURRENCIES.map((item) => {
+                                        const isSelected = currency === item.code;
+                                        return (
+                                            <Pressable
+                                                key={item.code}
+                                                disabled={loading}
+                                                style={[
+                                                    styles.currencyButton,
+                                                    isSelected && styles.currencyButtonSelected,
+                                                ]}
+                                                onPress={() => setCurrency(item.code)}
+                                            >
+                                                <Text
+                                                    style={[
+                                                        styles.currencyButtonText,
+                                                        isSelected && styles.currencyButtonTextSelected,
+                                                    ]}
+                                                >
+                                                    {item.label}
+                                                </Text>
+                                            </Pressable>
+                                        );
+                                    })}
+                                </View>
                             </View>
 
                             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -285,6 +320,37 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         fontSize: 16,
         color: '#35582b',
+    },
+    currencyGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 8,
+        width: '100%',
+        marginTop: 4,
+    },
+    currencyButton: {
+        flexBasis: '23%', // Mieści około 4 przyciski w rzędzie
+        flexGrow: 1,
+        height: 44,
+        backgroundColor: '#a3db7d',
+        borderRadius: 8,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: 'transparent',
+    },
+    currencyButtonSelected: {
+        backgroundColor: '#3f6927',
+        borderColor: '#264a1f',
+    },
+    currencyButtonText: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#264a1f',
+    },
+    currencyButtonTextSelected: {
+        color: '#ffffff',
+        fontWeight: '700',
     },
     error: {
         width: '100%',

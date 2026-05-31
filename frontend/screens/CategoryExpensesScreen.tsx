@@ -18,6 +18,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'CategoryExpenses'>;
 
 const FALLBACK_CATEGORY_COLOR = '#74bb4e';
 
+// Funkcja jawnie formatująca kwoty z bazy danych jako polskie złote (PLN)
 function formatCurrency(value: number) {
     return `${value.toFixed(2).replace('.', ',')} zł`;
 }
@@ -101,7 +102,7 @@ export default function CategoryExpensesScreen({ route, navigation }: Props) {
                             {categoryName}
                         </Text>
                         <Text style={styles.headerSubtitle}>
-                            Wydatki kategorii
+                            Wydatki kategorii (w PLN)
                         </Text>
                     </View>
                 </View>
@@ -165,9 +166,10 @@ export default function CategoryExpensesScreen({ route, navigation }: Props) {
                                 Metoda płatności: {item.paymentMethod}
                             </Text>
 
+                            {/* Pokazuje notatkę – w tym informację o przewalutowaniu, jeśli istniała */}
                             {item.note ? (
                                 <Text style={styles.expenseNote}>
-                                    Notatka: {item.note}
+                                    Info: {item.note}
                                 </Text>
                             ) : null}
 
@@ -186,7 +188,6 @@ export default function CategoryExpensesScreen({ route, navigation }: Props) {
         </SafeAreaView>
     );
 }
-
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,

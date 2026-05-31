@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-
 import { Expense } from '../../backend/models/Expense';
 import { ExpenseService } from '../../backend/services/expenseService';
+import { useUser } from './useUser'; // Importujemy hook użytkownika
 
 export const useExpenses = () => {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [loading, setLoading] = useState(false);
+    const { user } = useUser(); // Pobieramy aktualny stan użytkownika
 
     const load = async () => {
         setLoading(true);
@@ -31,7 +32,7 @@ export const useExpenses = () => {
 
     useEffect(() => {
         load();
-    }, []);
+    }, [user?.currency]); // 🔥 REAGUJE NA ZMIANĘ WALUTY W MENU
 
     return { expenses, loading, add, update, remove };
 };
