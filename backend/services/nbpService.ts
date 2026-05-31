@@ -36,7 +36,7 @@ export const getCurrencyCode = (input: string): string => {
 export const preloadAllRates = async (): Promise<void> => {
     try {
         // 🔥 POPRAWIONY URL: Usunięty slash przed "?format=json"
-        const response = await fetch('https://api.nbp.pl/api/exchangerates/tables/a?format=json', {
+        const response = await fetch('http://api.nbp.pl/api/exchangerates/tables/a?format=json', {
             method: 'GET',
             headers: {
                 'Accept': 'application/json',
