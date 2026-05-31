@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Pressable,
     ScrollView,
@@ -22,6 +22,10 @@ import { CategoryService } from '../../backend/services/categoryService';
 import { ExpenseService } from '../../backend/services/expenseService';
 import { IncomeService } from '../../backend/services/incomeService';
 
+import { useUser } from '../hooks/useUser';
+// 🔥 ZAIPORTUJ SWÓJ SERWIS NBP (Upewnij się, że ścieżka do pliku z Kroku 1 jest poprawna!)
+import { fetchCurrencyRate } from '../../backend/services/nbpService';
+
 type ExpenseCategory = {
     id: string;
     name: string;
@@ -29,8 +33,10 @@ type ExpenseCategory = {
     color: string;
 };
 
-function formatCurrency(value: number) {
-    return `${value.toFixed(2).replace('.', ',')}zł`;
+// Funkcja formatująca wygląd waluty w aplikacji
+function formatCurrency(value: number, currencyCode: string) {
+    const suffix = currencyCode === 'PLN' ? ' zł' : ` ${currencyCode}`;
+    return `${value.toFixed(2).replace('.', ',')}${suffix}`;
 }
 
 type AppHeaderProps = {
@@ -38,30 +44,19 @@ type AppHeaderProps = {
     onOpenRightSidebar: () => void;
 };
 
-function AppHeader({
-                       onOpenLeftSidebar,
-                       onOpenRightSidebar,
-                   }: AppHeaderProps) {
+function AppHeader({ onOpenLeftSidebar, onOpenRightSidebar }: AppHeaderProps) {
     return (
         <View style={styles.header}>
             <View style={styles.headerLeft}>
-                <Pressable
-                    style={styles.menuButton}
-                    onPress={onOpenLeftSidebar}
-                >
+                <Pressable style={styles.menuButton} onPress={onOpenLeftSidebar}>
                     <View style={styles.menuLine} />
                     <View style={styles.menuLine} />
                     <View style={styles.menuLine} />
                 </Pressable>
-
                 <Text style={styles.headerTitle}>HomeBudget</Text>
             </View>
-
             <View style={styles.headerRight}>
-                <Pressable
-                    style={styles.moreButton}
-                    onPress={onOpenRightSidebar}
-                >
+                <Pressable style={styles.moreButton} onPress={onOpenRightSidebar}>
                     <View style={styles.moreDot} />
                     <View style={styles.moreDot} />
                     <View style={styles.moreDot} />
@@ -85,13 +80,10 @@ type DonutChartProps = {
     incomeTotal: number;
     expenseTotal: number;
     categories: ExpenseCategory[];
+    currency: string;
 };
 
-function DonutChart({
-                        incomeTotal,
-                        expenseTotal,
-                        categories,
-                    }: DonutChartProps) {
+function DonutChart({ incomeTotal, expenseTotal, categories, currency }: DonutChartProps) {
     const size = 230;
     const strokeWidth = 48;
     const radius = (size - strokeWidth) / 2;
@@ -112,7 +104,6 @@ function DonutChart({
                         strokeWidth={strokeWidth}
                         fill="none"
                     />
-
                     {categories.map((category, index) => {
                         const fraction = total === 0 ? 0 : category.amount / total;
                         const dashLength = circumference * fraction;
@@ -138,23 +129,22 @@ function DonutChart({
                     })}
                 </G>
             </Svg>
-
             <View style={styles.chartCenter}>
-                <Text style={styles.chartIncome}>
-                    {formatCurrency(incomeTotal)}
-                </Text>
-
-                <Text style={styles.chartExpense}>
-                    {formatCurrency(expenseTotal)}
-                </Text>
+                <Text style={styles.chartIncome}>{formatCurrency(incomeTotal, currency)}</Text>
+                <Text style={styles.chartExpense}>{formatCurrency(expenseTotal, currency)}</Text>
             </View>
         </View>
     );
 }
 
 export default function DashboardScreen() {
-    const navigation =
-        useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+    const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+    const { user } = useUser();
+    const currentCurrency = user?.currency || 'PLN';
+
+    // 🔥 STAN PRZECHOWUJĄCY AKTUALNY KURS POBRANY Z TWOJEGO CACHE/API
+    const [activeRate, setActiveRate] = useState<number>(1);
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -162,8 +152,16 @@ export default function DashboardScreen() {
 
     const [leftSidebarVisible, setLeftSidebarVisible] = useState(false);
     const [rightSidebarVisible, setRightSidebarVisible] = useState(false);
-
     const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('all');
+
+    // 🔥 EFEKT: Reaguje na zmianę waluty użytkownika i błyskawicznie pobiera kurs z serwisu NBP
+    useEffect(() => {
+        const loadCurrentRate = async () => {
+            const rate = await fetchCurrencyRate(currentCurrency);
+            setActiveRate(rate || 1);
+        };
+        void loadCurrentRate();
+    }, [currentCurrency]);
 
     const loadDashboardData = useCallback(async () => {
         const loadedCategories = await CategoryService.getAll();
@@ -186,60 +184,47 @@ export default function DashboardScreen() {
 
     const filteredExpenses = useMemo(() => {
         return expenses.filter(expense => {
-            if (selectedPeriod === 'all') {
-                return true;
-            }
-
-            if (selectedPeriod === 'day') {
-                return expense.expenseDate.startsWith(today);
-            }
-
+            if (selectedPeriod === 'all') return true;
+            if (selectedPeriod === 'day') return expense.expenseDate.startsWith(today);
             return expense.expenseDate.startsWith(currentMonth);
         });
     }, [expenses, selectedPeriod, today, currentMonth]);
 
     const filteredIncomes = useMemo(() => {
         return incomes.filter(income => {
-            if (selectedPeriod === 'all') {
-                return true;
-            }
-
-            if (selectedPeriod === 'day') {
-                return income.incomeDate.startsWith(today);
-            }
-
+            if (selectedPeriod === 'all') return true;
+            if (selectedPeriod === 'day') return income.incomeDate.startsWith(today);
             return income.incomeDate.startsWith(currentMonth);
         });
     }, [incomes, selectedPeriod, today, currentMonth]);
 
+    // 🔥 PRZELICZANIE KWOT DLA KATEGORII NA WYKRESIE (Dzielenie przez pobrany kurs NBP)
     const chartCategories = useMemo<ExpenseCategory[]>(() => {
         return categories.map(category => {
-            const amount = filteredExpenses
+            const rawAmountInPLN = filteredExpenses
                 .filter(expense => expense.categoryId === category.id)
                 .reduce((sum, expense) => sum + expense.amount, 0);
 
             return {
                 id: category.id,
                 name: category.name,
-                amount,
+                amount: rawAmountInPLN / activeRate,
                 color: category.color || '#64748B',
             };
         });
-    }, [categories, filteredExpenses]);
+    }, [categories, filteredExpenses, activeRate]);
 
+    // 🔥 PRZELICZANIE ŁĄCZNYCH WYDATKÓW (Dzielenie przez pobrany kurs NBP)
     const expenseTotal = useMemo(() => {
-        return filteredExpenses.reduce(
-            (sum, expense) => sum + expense.amount,
-            0
-        );
-    }, [filteredExpenses]);
+        const rawTotalInPLN = filteredExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+        return rawTotalInPLN / activeRate;
+    }, [filteredExpenses, activeRate]);
 
+    // 🔥 PRZELICZANIE ŁĄCZNYCH PRZYCHODÓW (Dzielenie przez pobrany kurs NBP)
     const incomeTotal = useMemo(() => {
-        return filteredIncomes.reduce(
-            (sum, income) => sum + income.amount,
-            0
-        );
-    }, [filteredIncomes]);
+        const rawTotalInPLN = filteredIncomes.reduce((sum, income) => sum + income.amount, 0);
+        return rawTotalInPLN / activeRate;
+    }, [filteredIncomes, activeRate]);
 
     const balance = incomeTotal - expenseTotal;
 
@@ -272,32 +257,24 @@ export default function DashboardScreen() {
                         incomeTotal={incomeTotal}
                         expenseTotal={expenseTotal}
                         categories={chartCategories}
+                        currency={currentCurrency}
                     />
 
                     <View style={styles.balanceRow}>
                         <DecorBars />
-
                         <View style={styles.balanceBox}>
                             <Text style={styles.balanceText}>
-                                SALDO {formatCurrency(balance)}
+                                SALDO {formatCurrency(balance, currentCurrency)}
                             </Text>
                         </View>
-
                         <DecorBars />
                     </View>
 
                     <View style={styles.actionRow}>
-                        <Pressable
-                            style={styles.minusButton}
-                            onPress={() => openAddTransactionScreen('expense')}
-                        >
+                        <Pressable style={styles.minusButton} onPress={() => openAddTransactionScreen('expense')}>
                             <Text style={styles.minusText}>−</Text>
                         </Pressable>
-
-                        <Pressable
-                            style={styles.plusButton}
-                            onPress={() => openAddTransactionScreen('income')}
-                        >
+                        <Pressable style={styles.plusButton} onPress={() => openAddTransactionScreen('income')}>
                             <Text style={styles.plusText}>+</Text>
                         </Pressable>
                     </View>
@@ -320,7 +297,6 @@ export default function DashboardScreen() {
         </SafeAreaView>
     );
 }
-
 const styles = StyleSheet.create({
     safeArea: {
         flex: 1,

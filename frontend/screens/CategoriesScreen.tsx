@@ -1,26 +1,39 @@
 import React, { useMemo } from 'react';
-import { View, Text, FlatList } from 'react-native';
+import { View, Text, FlatList, StyleSheet } from 'react-native';
 import { useExpenses } from '../hooks/useExpenses';
 import { useCategories } from '../hooks/useCategories';
 import { useBudget } from '../hooks/useBudget';
 import { useUser } from '../hooks/useUser';
 
 export default function DashboardScreen() {
-    const { expenses } = useExpenses();
-    const { categories } = useCategories();
-    const { budgets } = useBudget();
+    const { expenses = [] } = useExpenses();
+    const { categories = [] } = useCategories();
+    const { budgets = [] } = useBudget();
     const { user } = useUser();
 
-    // 💰 total spent
+    // Dynamiczny sufix waluty pobierany prosto z profilu użytkownika (np. PLN, EUR)
+    const currencySuffix = useMemo(() => {
+        return user?.currency ? ` ${user.currency}` : ' zł';
+    }, [user?.currency]);
+
+    // Helper do szybkiego formatowania walutowego wewnątrz JSX
+    const formatValue = (value: number) => {
+        return `${value.toFixed(2).replace('.', ',')}${currencySuffix}`;
+    };
+
+    // 💰 Całkowity koszt (Suma wszystkich wydatków)
     const totalSpent = useMemo(() => {
         return expenses.reduce((sum, e) => sum + e.amount, 0);
     }, [expenses]);
 
-    // 📅 current month (YYYY-MM)
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    // 📅 Bieżący miesiąc pobierany systemowo (Format: YYYY-MM)
+    const currentMonth = useMemo(() => {
+        return new Date().toISOString().slice(0, 7);
+    }, []);
 
+    // Filtrowanie tablicy wydatków pod kątem obecnego okresu rozliczeniowego
     const monthlyExpenses = useMemo(() => {
-        return expenses.filter(e => e.expenseDate.startsWith(currentMonth));
+        return expenses.filter(e => e.expenseDate && e.expenseDate.startsWith(currentMonth));
     }, [expenses, currentMonth]);
 
     const monthlySpent = useMemo(() => {
@@ -31,78 +44,71 @@ export default function DashboardScreen() {
         return budgets.find(b => b.month === currentMonth);
     }, [budgets, currentMonth]);
 
+    const plannedAmount = currentBudget?.plannedAmount ?? 0;
+
     return (
-        <View style={{ flex: 1, padding: 16, gap: 16 }}>
+        <View style={styles.container}>
 
-            {/* 👤 USER */}
-            <View>
-                <Text style={{ fontSize: 20, fontWeight: 'bold' }}>
-                    Witaj {user?.name ?? 'Użytkowniku'}
+            {/* 👤 SEKCJA PROFILU */}
+            <View style={styles.card}>
+                <Text style={styles.welcomeText}>
+                    Witaj, {user?.name ?? 'Użytkowniku'}
                 </Text>
-                <Text>Waluta: {user?.currency ?? '-'}</Text>
+                <Text style={styles.subText}>Domyślna waluta: {user?.currency ?? 'PLN'}</Text>
             </View>
 
-            {/* 💰 TOTAL */}
-            <View>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                    Wszystkie wydatki
-                </Text>
-                <Text style={{ fontSize: 16 }}>{totalSpent.toFixed(2)}</Text>
+            {/* 💰 SUMARYCZNE STATYSTYKI */}
+            <View style={styles.row}>
+                <View style={[styles.card, { flex: 1 }]}>
+                    <Text style={styles.label}>Wszystkie wydatki</Text>
+                    <Text style={styles.valueAccent}>{formatValue(totalSpent)}</Text>
+                </View>
+
+                <View style={[styles.card, { flex: 1 }]}>
+                    <Text style={styles.label}>Miesiąc ({currentMonth})</Text>
+                    <Text style={styles.value}>{formatValue(monthlySpent)}</Text>
+                </View>
             </View>
 
-            {/* 📅 MONTHLY */}
-            <View>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                    Ten miesiąc ({currentMonth})
+            {/* 🎯 KONTROLA BUDŻETU */}
+            <View style={styles.card}>
+                <Text style={styles.label}>Kontrola limitu budżetowego</Text>
+                <Text style={styles.subText}>
+                    Zaplanowano: {formatValue(plannedAmount)}
                 </Text>
-                <Text style={{ fontSize: 16 }}>{monthlySpent.toFixed(2)}</Text>
-            </View>
-
-            {/* 🎯 BUDGET */}
-            <View>
-                <Text style={{ fontSize: 18, fontWeight: '600' }}>
-                    Budżet
-                </Text>
-
-                <Text>
-                    Plan: {currentBudget?.plannedAmount ?? 0}
-                </Text>
-
-                <Text>
-                    Wykorzystanie: {monthlySpent.toFixed(2)} / {currentBudget?.plannedAmount ?? 0}
+                <Text style={[
+                    styles.usageText,
+                    monthlySpent > plannedAmount ? styles.overBudget : styles.underBudget
+                ]}>
+                    Wykorzystanie: {formatValue(monthlySpent)} / {formatValue(plannedAmount)}
                 </Text>
             </View>
 
-            {/* 🧾 RECENT EXPENSES */}
-            <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 8 }}>
+            {/* 🧾 OSTATNIE TRANSAKCJE */}
+            <View style={[styles.card, { flex: 1, paddingBottom: 0 }]}>
+                <Text style={[styles.label, { marginBottom: 12 }]}>
                     Ostatnie wydatki
                 </Text>
 
                 <FlatList
                     data={expenses.slice().reverse().slice(0, 10)}
                     keyExtractor={(item) => item.id}
+                    showsVerticalScrollIndicator={false}
                     renderItem={({ item }) => {
                         const category = categories.find(c => c.id === item.categoryId);
 
                         return (
-                            <View
-                                style={{
-                                    padding: 10,
-                                    borderBottomWidth: 1,
-                                    borderColor: '#eee',
-                                }}
-                            >
-                                <Text style={{ fontWeight: '600' }}>
-                                    {item.title}
-                                </Text>
-
-                                <Text>
-                                    {item.amount} • {category?.name ?? 'Brak kategorii'}
-                                </Text>
-
-                                <Text style={{ fontSize: 12, opacity: 0.6 }}>
-                                    {item.expenseDate}
+                            <View style={styles.itemRow}>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.itemTitle}>
+                                        {item.title}
+                                    </Text>
+                                    <Text style={styles.itemSub}>
+                                        {category?.name ?? 'Brak kategorii'} • {item.expenseDate}
+                                    </Text>
+                                </View>
+                                <Text style={styles.itemAmount}>
+                                    {formatValue(item.amount)}
                                 </Text>
                             </View>
                         );
@@ -112,3 +118,86 @@ export default function DashboardScreen() {
         </View>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        padding: 16,
+        backgroundColor: '#f4f6f8',
+        gap: 12,
+    },
+    card: {
+        backgroundColor: '#ffffff',
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.08,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+    row: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    welcomeText: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#1e293b',
+    },
+    label: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#64748b',
+        marginBottom: 4,
+    },
+    subText: {
+        fontSize: 13,
+        color: '#64748b',
+        marginTop: 2,
+    },
+    value: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#0f172a',
+    },
+    valueAccent: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#b91c1c',
+    },
+    usageText: {
+        fontSize: 15,
+        fontWeight: '700',
+        marginTop: 6,
+    },
+    underBudget: {
+        color: '#16a34a',
+    },
+    overBudget: {
+        color: '#dc2626',
+    },
+    itemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderColor: '#f1f5f9',
+    },
+    itemTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#334155',
+    },
+    itemSub: {
+        fontSize: 12,
+        color: '#94a3b8',
+        marginTop: 2,
+    },
+    itemAmount: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#0f172a',
+    },
+});
