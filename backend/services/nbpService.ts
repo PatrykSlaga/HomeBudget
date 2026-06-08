@@ -100,3 +100,25 @@ export const convertToPLN = async (amount: number, fromCurrency: string): Promis
 
     return Math.round(safeAmount * rate * 100) / 100;
 };
+
+/**
+ * Zwraca nazwę waluty wraz z jej aktualnym kursem w formacie "KOD KURS:1" (np. USD 3,95:1)
+ */
+export const getCurrencyLabelWithRate = (currencyInput: string): string => {
+    const code = getCurrencyCode(currencyInput);
+
+    // Dla PLN relacja to zawsze 1:1
+    if (code === 'PLN') {
+        return 'PLN 1:1';
+    }
+
+    // Wyciągamy kurs z pamięci podręcznej (lub awaryjny, jeśli sieć padła)
+    const rate = cachedRates[code] || FALLBACK_RATES[code];
+
+    if (!rate) return code; // Zabezpieczenie, gdyby waluta była nieznana
+
+    // Zaokrąglamy do 2 miejsc po przecinku i zamieniamy kropkę na przecinek
+    const formattedRate = rate.toFixed(2).replace('.', ',');
+
+    return `${code} ${formattedRate}:1`;
+};

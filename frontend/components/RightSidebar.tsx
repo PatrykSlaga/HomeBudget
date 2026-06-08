@@ -12,6 +12,7 @@ import {
 
 import { Category } from '../../backend/models/Category';
 import { useUser } from '../hooks/useUser';
+import { getCurrencyLabelWithRate } from '../../backend/services/nbpService';
 
 type RightSidebarProps = {
     visible: boolean;
@@ -22,16 +23,17 @@ type RightSidebarProps = {
 
 const SIDEBAR_WIDTH = 130;
 const FALLBACK_CATEGORY_COLOR = '#64748B';
+const UNIFORM_CURRENCY_COLOR = '#54aa3f';
 
 const AVAILABLE_CURRENCIES = [
-    { name: 'Polski Złoty', code: 'PLN', color: '#1E3A8A' },
-    { name: 'Euro', code: 'EUR', color: '#0284C7' },
-    { name: 'Dolar', code: 'USD' , color: '#16A34A'},
-    { name: 'Yen japoński', code: 'JPY', color: '#DC2626' },
-    { name: 'Korona Czeska', code: 'CZK', color: '#D97706' },
-    { name: 'Won koreański', code: 'KRW', color: '#7C3AED' },
-    { name: 'Forint węg.', code: 'HUF', color: '#059669' },
-    { name: 'Frank Szwajc.', code: 'CHF', color: '#4B5563' }
+    { name: 'Polski Złoty', code: 'PLN' },
+    { name: 'Euro', code: 'EUR' },
+    { name: 'Dolar', code: 'USD' },
+    { name: 'Yen japoński', code: 'JPY' },
+    { name: 'Korona Czeska', code: 'CZK' },
+    { name: 'Won koreański', code: 'KRW' },
+    { name: 'Forint węg.', code: 'HUF' },
+    { name: 'Frank Szwajc.', code: 'CHF' }
 ];
 
 export default function RightSidebar({
@@ -150,15 +152,14 @@ export default function RightSidebar({
                         {currencyExpanded ? (
                             <View style={styles.innerListContainer}>
                                 {AVAILABLE_CURRENCIES.map(curr => {
-                                    // Sprawdzamy stan zsynchronizowany globalnie
                                     const isSelected = user?.currency === curr.code;
+                                    const currencyLabelWithRate = getCurrencyLabelWithRate(curr.code);
 
                                     return (
                                         <Pressable
                                             key={curr.code}
                                             style={[
                                                 styles.currencyRow,
-                                                { borderColor: curr.color },
                                                 isSelected && styles.currencyRowSelected
                                             ]}
                                             onPress={() => handleCurrencyChange(curr.code)}
@@ -167,11 +168,10 @@ export default function RightSidebar({
                                                 numberOfLines={1}
                                                 style={[
                                                     styles.currencyText,
-                                                    { color: curr.color },
                                                     isSelected && styles.currencyTextSelected
                                                 ]}
                                             >
-                                                {isSelected ? '✓ ' : ''}{curr.code}
+                                                {isSelected ? '✓ ' : ''}{currencyLabelWithRate}
                                             </Text>
                                         </Pressable>
                                     );
@@ -261,6 +261,7 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderBottomWidth: 1,
         backgroundColor: '#ffffff',
+        borderColor: UNIFORM_CURRENCY_COLOR,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 4,
@@ -271,6 +272,7 @@ const styles = StyleSheet.create({
     currencyText: {
         fontSize: 11,
         fontWeight: '800',
+        color: UNIFORM_CURRENCY_COLOR
     },
     currencyTextSelected: {
         fontWeight: '900',
