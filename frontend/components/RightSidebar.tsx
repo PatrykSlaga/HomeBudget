@@ -42,8 +42,7 @@ export default function RightSidebar({
                                          onOpenCategory,
                                          onClose,
                                      }: RightSidebarProps) {
-    // Pobieramy globalną metodę zmiany waluty z naszego nowego Contextu
-    const { user, changeCurrency } = useUser();
+    const { user } = useUser();
     const [categoriesExpanded, setCategoriesExpanded] = useState(false);
     const [currencyExpanded, setCurrencyExpanded] = useState(false);
 
@@ -62,17 +61,6 @@ export default function RightSidebar({
         }
     }, [visible, translateX]);
 
-    const handleCurrencyChange = (currencyCode: string) => {
-        if (!user) return;
-
-        try {
-            // Wywołujemy bezpieczną metodę z poziomu kontekstu
-            changeCurrency(currencyCode);
-            onClose();
-        } catch (error) {
-            Alert.alert('Błąd', 'Nie udało się zmienić waluty.');
-        }
-    };
 
     return (
         <Modal visible={visible} transparent animationType="none">
@@ -137,7 +125,7 @@ export default function RightSidebar({
                             </View>
                         ) : null}
 
-                        {/* === SEKCJA: WALUTY === */}
+                        {/* === SEKCJA: WALUTY (Tylko wyświetlanie) === */}
                         <Pressable
                             style={[styles.sectionButton, { marginTop: 24 }]}
                             onPress={() => setCurrencyExpanded(prev => !prev)}
@@ -156,13 +144,12 @@ export default function RightSidebar({
                                     const currencyLabelWithRate = getCurrencyLabelWithRate(curr.code);
 
                                     return (
-                                        <Pressable
+                                        <View
                                             key={curr.code}
                                             style={[
                                                 styles.currencyRow,
                                                 isSelected && styles.currencyRowSelected
                                             ]}
-                                            onPress={() => handleCurrencyChange(curr.code)}
                                         >
                                             <Text
                                                 numberOfLines={1}
@@ -173,7 +160,7 @@ export default function RightSidebar({
                                             >
                                                 {isSelected ? '✓ ' : ''}{currencyLabelWithRate}
                                             </Text>
-                                        </Pressable>
+                                        </View>
                                     );
                                 })}
                             </View>
@@ -184,7 +171,6 @@ export default function RightSidebar({
         </Modal>
     );
 }
-
 const styles = StyleSheet.create({
     root: {
         flex: 1,
